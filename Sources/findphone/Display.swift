@@ -91,10 +91,12 @@ enum Display {
         if let issue = s.radioIssue { out.append("  \(issue)") }
         if s.advertisers.isEmpty { out.append("  (nothing yet — give it a few seconds)") }
 
-        for (i, a) in s.advertisers.prefix(12).enumerated() {
+        for a in s.advertisers.prefix(12) {
             let live = Int(a.smoothed.rounded())
             let stale = s.at.timeIntervalSince(a.last) > 3 ? " (stale)" : ""
-            out.append(String(format: "%2d. %@ %4d dBm  peak %4d  ", i + 1, bar(live), live, a.peak)
+            out.append(surveyPrefix(a.number)
+                       + String(format: "%@ %4d dBm  peak %4d  ",
+                                bar(live), live, a.peak)
                        + pad(Proximity.describe(live), Proximity.labelWidth) + stale)
             out.append("    \(redact ? a.kind : a.label)")
         }
