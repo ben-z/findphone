@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/cli-mode-validation]
   pull_request:
 
 jobs:
@@ -24,10 +24,21 @@ jobs:
           if ./dist/findphone --bogus >/dev/null 2>&1; then
             echo "expected a non-zero exit for an unknown flag"; exit 1
           fi
+          if ./dist/findphone --list phone >/dev/null 2>&1; then
+            echo "expected --list with a device name to fail"; exit 1
+          fi
+          if ./dist/findphone --list --sound >/dev/null 2>&1; then
+            echo "expected --list with --sound to fail"; exit 1
+          fi
           ./dist/findphone --bogus 2>&1 | grep -q "unknown option '--bogus'"
           ./dist/findphone one two 2>&1 | grep -q "expected one device name"
           ./dist/findphone --sound 2>&1 | grep -q "needs a device name"
+          ./dist/findphone --list phone 2>&1 | grep -q -- "--list does not accept a device name"
+          ./dist/findphone --list --sound 2>&1 | grep -q -- "--sound cannot be used with --list"
           test -z "$(./dist/findphone --bogus 2>/dev/null)"
+          test -z "$(./dist/findphone --list phone 2>/dev/null)"
+          test -z "$(./dist/findphone --list --sound 2>/dev/null)"
+          ./dist/findphone --list --redact >/dev/null
 
       - name: Upload binary
         uses: actions/upload-artifact@v7
