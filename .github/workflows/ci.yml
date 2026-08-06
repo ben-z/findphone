@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, fix/cli-mode-validation]
+    branches: [main]
   pull_request:
 
 jobs:
