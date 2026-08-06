@@ -35,8 +35,16 @@ if names.count > 1 {
 }
 
 let redact = args.contains("--redact")
+let list = args.contains("--list")
 
-if args.contains("--list") {
+if list && !names.isEmpty {
+    usageError("--list does not accept a device name")
+}
+if list && args.contains("--sound") {
+    usageError("--sound cannot be used with --list")
+}
+
+if list {
     Display.list(Classic.devicesByStrength(), redact: redact)
     exit(0)
 }
