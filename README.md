@@ -99,6 +99,14 @@ The tool therefore counts a measurement only when the value actually changes,
 which is why the reported measurement count is far lower than the poll rate —
 and honest.
 
+A hunt-mode name is checked against the paired list once at startup, before
+any of this. Match more than one paired device and findphone exits and asks
+for something more specific, rather than silently locking onto whichever one
+`system_profiler` happens to list first. Match none — the device is BLE-only,
+or the name has a typo — and source 3 is skipped entirely, so it doesn't poll
+`system_profiler` for the rest of the run chasing a match that will never
+come.
+
 ## Permissions
 
 Needs Bluetooth access for whichever terminal runs it, under
