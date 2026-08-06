@@ -48,6 +48,16 @@ enum Classic {
     static func find(name: String) -> ClassicDevice? {
         devices().first { $0.name.localizedCaseInsensitiveContains(name) }
     }
+
+    /// All paired devices matching a name, so a caller can tell an ambiguous
+    /// match from a resolvable one before committing to either. Sorted, since
+    /// devices() draws from JSON dictionaries whose enumeration order is not
+    /// stable across runs, and this list can end up in an error message.
+    static func matches(name: String) -> [ClassicDevice] {
+        devices()
+            .filter { $0.name.localizedCaseInsensitiveContains(name) }
+            .sorted { ($0.name.lowercased(), $0.address) < ($1.name.lowercased(), $1.address) }
+    }
 }
 
 /// Remembers which CoreBluetooth peripheral matched a search, so a later run

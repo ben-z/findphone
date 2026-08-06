@@ -55,7 +55,21 @@ if args.contains("--sound") {
     }
 }
 
-let tracker = Tracker(targetName: names.first)
+/// Resolved once against the paired list, not the live scan: BLE-only devices
+/// aren't known until scanning starts, so only this half of the ambiguity is
+/// catchable up front. Zero matches means classic polling would just spawn
+/// system_profiler forever for a device it will never find.
+var pollClassic = true
+if let name = names.first {
+    let matches = Classic.matches(name: name)
+    if matches.count > 1 {
+        usageError("'\(name)' matches \(matches.count) paired devices — be more specific: "
+                   + matches.map(\.name).joined(separator: ", "))
+    }
+    pollClassic = !matches.isEmpty
+}
+
+let tracker = Tracker(targetName: names.first, pollClassic: pollClassic)
 tracker.start()
 
 Timer.scheduledTimer(withTimeInterval: names.isEmpty ? 1.0 : 0.25, repeats: true) { _ in

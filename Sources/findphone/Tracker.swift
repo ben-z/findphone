@@ -61,6 +61,7 @@ private let advertiserTTL: TimeInterval = 20
 
 final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private let targetName: String?
+    private let pollClassicEnabled: Bool
     private let startedAt = Date()
 
     private var central: CBCentralManager!
@@ -79,8 +80,9 @@ final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     private var isLive: Bool { lock.withLock { liveLink } }
 
-    init(targetName: String?) {
+    init(targetName: String?, pollClassic: Bool) {
         self.targetName = targetName
+        self.pollClassicEnabled = pollClassic
         super.init()
     }
 
@@ -88,7 +90,9 @@ final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         central = CBCentralManager(delegate: self, queue: nil)
         if let name = targetName {
             cachedID = DeviceCache.peripheralID(for: name)
-            pollClassic(name: name)
+            if pollClassicEnabled {
+                pollClassic(name: name)
+            }
         }
         Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.prune()
