@@ -16,6 +16,7 @@ let continuityNames: [UInt8: String] = [
 let handheldTypes = Set(continuityNames.keys)
 
 struct Advertiser {
+    let number: Int
     var name: String?
     var peak: Int
     var smoothed: Double
@@ -69,6 +70,7 @@ final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     private var readings: [Reading] = []
     private var advertisers: [UUID: Advertiser] = [:]
+    private var surveyNumbers = SessionNumbers<UUID>()
     private var address: String?
     private var radioIssue: String?
     private var cachedID: UUID?
@@ -211,8 +213,10 @@ final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         if targetName == nil && types.isDisjoint(with: handheldTypes) { return }
 
         let now = Date()
+        let number = targetName == nil ? surveyNumbers.number(for: p.identifier) : 0
         var a = advertisers[p.identifier, default:
-            Advertiser(name: nil, peak: r, smoothed: Double(r), types: [], last: now)]
+            Advertiser(number: number, name: nil, peak: r, smoothed: Double(r),
+                       types: [], last: now)]
         a.name = a.name ?? (d[CBAdvertisementDataLocalNameKey] as? String ?? p.name)
         a.peak = max(a.peak, r)
         a.smoothed = a.smoothed * 0.7 + Double(r) * 0.3

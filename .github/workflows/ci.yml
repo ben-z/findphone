@@ -11,6 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Test session labels
+        run: |
+          swiftc Sources/findphone/SessionLabels.swift \
+            Tests/SessionLabelsTests/main.swift \
+            -o /tmp/session-label-tests
+          /tmp/session-label-tests
+
       - name: Build universal binary
         run: ./scripts/build-universal.sh dist
 
