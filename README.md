@@ -19,6 +19,10 @@ xattr -dr com.apple.quarantine findphone
 It is unsigned, so macOS quarantines it on download; the `xattr` line clears
 that. Requires macOS 13 or later.
 
+findphone is macOS-only. It does not run on Windows or Linux: it relies on
+CoreBluetooth, AudioToolbox, and `system_profiler`, rather than portable
+Bluetooth interfaces.
+
 ## Build
 
 ```sh
