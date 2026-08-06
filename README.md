@@ -39,6 +39,7 @@ For a universal arm64 + x86_64 binary, which is what CI ships:
 findphone            # survey mode: every nearby Apple handheld, by signal
 findphone iphone     # hunt mode: track one device by name (case-insensitive)
 findphone --list     # paired devices and their addresses
+findphone --select   # choose one device from nearby list, then track it
 ```
 
 Add `--sound` in hunt mode for clicks that speed up as you close in, the way a
@@ -58,6 +59,9 @@ and in survey mode replaces discovered device names with the device kind,
 since those names are not always yours. A public address is a stable hardware
 identifier and, unlike a BLE advertising address, does not rotate, so it is
 worth keeping out of a video.
+
+When multiple nearby devices are visible, `findphone --select` enters a compact
+numbered list mode and tracks the selected candidate by stable identity.
 
 Two things stay visible deliberately: the name you typed in hunt mode, and the
 names in `--list`, because picking a target means reading them. `--list` is

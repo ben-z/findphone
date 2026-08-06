@@ -5,6 +5,7 @@ let package = Package(
     name: "findphone",
     platforms: [.macOS(.v13)],
     targets: [
-        .executableTarget(name: "findphone", path: "Sources/findphone")
+        .executableTarget(name: "findphone", path: "Sources/findphone"),
+        .testTarget(name: "findphoneTests", dependencies: ["findphone"]),
     ]
 )

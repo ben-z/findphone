@@ -15,7 +15,8 @@ let continuityNames: [UInt8: String] = [
 /// Continuity message types that phones, tablets and watches emit.
 let handheldTypes = Set(continuityNames.keys)
 
-struct Advertiser {
+struct Advertiser: Equatable {
+    let identity: String
     var name: String?
     var peak: Int
     var smoothed: Double
@@ -33,6 +34,10 @@ struct Advertiser {
 }
 
 struct Snapshot {
+    let candidates: [Advertiser]
+    let selectedIdentity: String?
+    let isManualTracking: Bool
+    let focusedAdvertiser: Advertiser?
     let targetName: String?
     let address: String?
     let at: Date
@@ -40,7 +45,6 @@ struct Snapshot {
     let readings: [Reading]
     let link: LinkState
     let radioIssue: String?
-    let advertisers: [Advertiser]
     let deviceCount: Int
 
     /// The reading everything reports: a short median, so one reflected spike
@@ -52,6 +56,36 @@ struct Snapshot {
     /// Whether the last reading is recent enough to steer by.
     var isFresh: Bool {
         readings.last.map { at.timeIntervalSince($0.at) < 10 } ?? false
+    }
+
+    var focusedLive: Int? {
+        guard let focused = focusedAdvertiser else { return nil }
+        return Int(focused.smoothed.rounded())
+    }
+
+    var focusedFresh: Bool {
+        guard let focused = focusedAdvertiser else { return isFresh }
+        return at.timeIntervalSince(focused.last) < 10
+    }
+
+    var focusedLabel: String? {
+        focusedAdvertiser?.label
+    }
+
+    /// Use focused data when manually selected; fall back to all-source live data.
+    var effectiveLive: Int? {
+        focusedLive ?? live
+    }
+
+    /// Use focused staleness when manually selected; fall back to global freshness.
+    var effectiveFresh: Bool {
+        if selectedIdentity == nil {
+            return isFresh
+        }
+
+        return selectedIdentity != nil && focusedAdvertiser != nil
+            ? focusedFresh
+            : false
     }
 }
 
@@ -68,7 +102,8 @@ final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private var linkTimer: Timer?
 
     private var readings: [Reading] = []
-    private var advertisers: [UUID: Advertiser] = [:]
+    private var advertisers: [String: Advertiser] = [:]
+    private var selectedIdentity: String?
     private var address: String?
     private var radioIssue: String?
     private var cachedID: UUID?
@@ -97,18 +132,26 @@ final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     func snapshot() -> Snapshot {
         let now = Date()
+        let snapshotCandidates = lock.withLock { advertisers.values.sorted { $0.smoothed > $1.smoothed } }
+        let selectedIdentity = lock.withLock { self.selectedIdentity }
+        let focusedAdvertiser = selectedIdentity.flatMap { selected in snapshotCandidates.first { $0.identity == selected } }
         return Snapshot(
+            candidates: targetName == nil ? snapshotCandidates : [],
+            selectedIdentity: selectedIdentity,
+            isManualTracking: selectedIdentity != nil,
+            focusedAdvertiser: focusedAdvertiser,
             targetName: targetName,
             address: address,
             at: now,
             elapsed: Int(now.timeIntervalSince(startedAt)),
-            readings: readings,
+            readings: lock.withLock { readings },
             link: isLive ? .live : (linkUp ? .classic : .down),
             radioIssue: radioIssue,
-            advertisers: targetName == nil
-                ? advertisers.values.sorted { $0.smoothed > $1.smoothed }
-                : [],
-            deviceCount: advertisers.count)
+            deviceCount: snapshotCandidates.count)
+    }
+
+    func setManualSelection(identity: String?) {
+        lock.withLock { selectedIdentity = identity }
     }
 
     private func prune() {
@@ -211,14 +254,21 @@ final class Tracker: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         if targetName == nil && types.isDisjoint(with: handheldTypes) { return }
 
         let now = Date()
-        var a = advertisers[p.identifier, default:
-            Advertiser(name: nil, peak: r, smoothed: Double(r), types: [], last: now)]
+        let identity = p.identifier.uuidString
+        var a = advertisers[identity, default:
+            Advertiser(
+                identity: identity,
+                name: nil,
+                peak: r,
+                smoothed: Double(r),
+                types: [],
+                last: now)]
         a.name = a.name ?? (d[CBAdvertisementDataLocalNameKey] as? String ?? p.name)
         a.peak = max(a.peak, r)
         a.smoothed = a.smoothed * 0.7 + Double(r) * 0.3
         a.types.formUnion(types)
         a.last = now
-        advertisers[p.identifier] = a
+        advertisers[identity] = a
 
         guard let t = targetName, let n = a.name,
               n.localizedCaseInsensitiveContains(t) else { return }

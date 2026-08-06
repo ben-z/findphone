@@ -22,7 +22,9 @@ private let maskedAddress = "••:••:••:••:••:••"
 enum Display {
     /// One write per frame; twenty prints to a line-buffered TTY tears.
     static func render(_ s: Snapshot, redact: Bool = false) {
-        let lines = s.targetName == nil ? survey(s, redact: redact) : hunt(s, redact: redact)
+        let lines = (s.targetName == nil && !s.isManualTracking)
+            ? survey(s, redact: redact)
+            : hunt(s, redact: redact)
         print(clearScreen + lines.joined(separator: "\n"), terminator: "\n")
         fflush(stdout)
     }
@@ -30,7 +32,8 @@ enum Display {
     private static func hunt(_ s: Snapshot, redact: Bool) -> [String] {
         let address = redact ? maskedAddress : (s.address ?? "")
         let status = "\(s.link.rawValue) · \(s.elapsed)s"
-        let title = " \(s.targetName!)   \(address)"
+        let titleLabel = s.targetName ?? s.focusedLabel ?? "selected target"
+        let title = " \(titleLabel)   \(address)"
         let gap = max(1, huntWidth - title.count - status.count)
         let out = [Style.wrap(title + String(repeating: " ", count: gap) + status, Style.dim),
                    huntRule]
@@ -44,10 +47,13 @@ enum Display {
                           "  (~10-20 m), or shut inside something metal."]
         }
 
-        let live = s.live ?? last.rssi
+        let live = s.effectiveLive ?? s.live ?? last.rssi
+        let age = Int(s.at.timeIntervalSince(s.isManualTracking
+                                            ? (s.focusedAdvertiser?.last ?? last.at)
+                                            : last.at)
+                                              .rounded())
         let lastMinute = s.readings.since(60, now: s.at)
         let peak = lastMinute.peakRSSI ?? live
-        let age = Int(s.at.timeIntervalSince(last.at).rounded())
         let tone = bandTones[Proximity.band(live)]
 
         let digits = bigNumber(String(live)).enumerated().map { row, glyph in
@@ -66,7 +72,7 @@ enum Display {
             margin + Style.wrap(sparkline(s.readings.suffix(44)), Style.dim),
             Style.wrap("\(margin)\(sparkCaption) · \(lastMinute.count) last min"
                        + " · \(s.readings.count) total", Style.dim),
-            Style.wrap("\(margin)peak/min \(peak) · via \(last.source)"
+            Style.wrap("\(margin)peak/min \(peak)"
                        + " · refreshed \(age)s ago", Style.dim),
         ]
         + (age > 15 ? [Style.wrap("\(margin)stale — hold still for a refresh", Style.amber)] : [])
@@ -89,9 +95,9 @@ enum Display {
             surveyRule,
         ]
         if let issue = s.radioIssue { out.append("  \(issue)") }
-        if s.advertisers.isEmpty { out.append("  (nothing yet — give it a few seconds)") }
+        if s.candidates.isEmpty { out.append("  (nothing yet — give it a few seconds)") }
 
-        for (i, a) in s.advertisers.prefix(12).enumerated() {
+        for (i, a) in s.candidates.prefix(12).enumerated() {
             let live = Int(a.smoothed.rounded())
             let stale = s.at.timeIntervalSince(a.last) > 3 ? " (stale)" : ""
             out.append(String(format: "%2d. %@ %4d dBm  peak %4d  ", i + 1, bar(live), live, a.peak)
